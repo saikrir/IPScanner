@@ -1,44 +1,17 @@
-use ping::dgramsock::ping;
-use rand::random;
-use std::{net::IpAddr, time::Duration};
+use IPScanner::{InputIp, IpAddressRange, IpPinger};
+
+
+
 
 fn main() {
-    let ip_prefix = "192.168.86";
+    let result = InputIp::parse("192.168.86", 1, 255);
+    let mut ip_addr_range = IpAddressRange::new();
+    ip_addr_range.generate(&result);
+    println!("IP Addresses {}", ip_addr_range.ip_count());
 
-    let comp: Vec<u8> = ip_prefix
-        .split(".")
-        .map(|c| c.parse::<u8>().unwrap())
-        .collect();
+    let ip_pinger = IpPinger::new(ip_addr_range.ip_addresses, 1, 1);
 
-    let mut working_ips: Vec<IpAddr> = vec![];
-    let timeout = Duration::from_secs(1);
+    let results = ip_pinger.ping_in_range();
 
-    for ip_addr in get_local_ip_addresses(1, 40, &comp) {
-        let working_ip = match ping(
-            ip_addr,
-            Some(timeout),
-            Some(166),
-            Some(3),
-            Some(5),
-            Some(&random()),
-        ) {
-            Ok(()) => ip_addr,
-            Err(_) => {
-                continue;
-            }
-        };
-        working_ips.push(working_ip);
-    }
-
-    println!("Found {} ips {:#?} ", working_ips.len(), working_ips)
-}
-
-fn get_local_ip_addresses(begin_index: u8, end_index: u8, prefix: &Vec<u8>) -> Vec<IpAddr> {
-    let mut ip_addresses: Vec<IpAddr> = vec![];
-
-    for last_octet in begin_index..end_index {
-        let ip_addr = IpAddr::from([prefix[0], prefix[1], prefix[2], last_octet]);
-        ip_addresses.push(ip_addr);
-    }
-    return ip_addresses;
+    println!("Found {}, IPs: {:?} ", results.len(), results);
 }

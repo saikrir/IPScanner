@@ -4,5 +4,4 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-ping = "0.5.2"
-rand = "0.8.5"
+pinger = "2.0.0"
