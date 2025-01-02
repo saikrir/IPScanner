@@ -1,19 +1,22 @@
-use std::{ ops::Range, sync::mpsc, thread, time::Duration};
+use std::{ops::Range, sync::mpsc, thread, time::Duration};
 
 use pinger::{ping, PingOptions, PingResult};
 
 pub struct InputIp {
-    ip_triplet: [u8;3],
-    scan_range: Range<u8>
+    ip_triplet: [u8; 3],
+    scan_range: Range<u8>,
 }
 
 impl InputIp {
-    pub fn parse(input_triplet: &str, start: u8, end:u8) -> Self {
-        let vec: Vec<u8> = input_triplet.split(".").map(|s| s.parse::<u8>().unwrap()).collect();
+    pub fn parse(input_triplet: &str, start: u8, end: u8) -> Self {
+        let vec: Vec<u8> = input_triplet
+            .split(".")
+            .map(|s| s.parse::<u8>().unwrap())
+            .collect();
         let range = start..end;
         Self {
             ip_triplet: [vec[0], vec[1], vec[2]],
-            scan_range: range
+            scan_range: range,
         }
     }
 
@@ -24,20 +27,21 @@ impl InputIp {
 
 impl ToString for InputIp {
     fn to_string(&self) -> String {
-       format!("{}.{}.{}", self.ip_triplet[0], self.ip_triplet[1], self.ip_triplet[2])
+        format!(
+            "{}.{}.{}",
+            self.ip_triplet[0], self.ip_triplet[1], self.ip_triplet[2]
+        )
     }
 }
 
-pub struct IpAddressRange{
+pub struct IpAddressRange {
     pub ip_addresses: Vec<String>,
 }
 
 impl IpAddressRange {
     pub fn new() -> Self {
         let v: Vec<String> = Vec::new();
-        Self{
-            ip_addresses: v
-        }
+        Self { ip_addresses: v }
     }
 
     pub fn generate(&mut self, ip_input: &InputIp) {
@@ -52,78 +56,78 @@ impl IpAddressRange {
     pub fn ip_count(&self) -> usize {
         self.ip_addresses.len()
     }
-
 }
-
 
 trait Pinger {
-    fn ping(&self, ip_address: &str)-> Result<(), &str>;
+    fn ping(&self, ip_address: &str) -> Result<(), &str>;
 }
 
-
-fn pingOptions(ping_count: u8, interval:Duration, ip_address: &str) -> PingOptions {
+fn pingOptions(ping_count: u8, interval: Duration, ip_address: &str) -> PingOptions {
     let ping_options = PingOptions::new(ip_address, interval, None);
-    ping_options.with_raw_arguments(vec!["-c",ping_count.to_string().as_str()])
+    ping_options.with_raw_arguments(vec!["-c", ping_count.to_string().as_str()])
 }
 
 pub struct IpPinger {
     ip_addresses: Vec<String>,
     ping_count: u8,
-    ping_interval: Duration, 
+    ping_interval: Duration,
 }
 
-impl IpPinger {
-    pub fn new(ip_addresses: Vec<String>, ping_count: u8, ping_interval: u64) ->Self {
-        Self{
-            ip_addresses,
-            ping_count,
-            ping_interval: Duration::from_secs(ping_interval)
-        }
-    }
-
-    pub fn ping_in_range(&self) -> Vec<String>{
-       
+fn ping_ips(ip_addresses: &Vec<String>, ping_cnt: u8) -> Vec<String> {
+    let mut ret_val: Vec<String> = vec![];
+    for _x in 1..=ping_cnt {
+        println!("Looping {_x}");
         let (tx, rx) = mpsc::channel::<String>();
-
-        for ip_address in self.ip_addresses.clone() {
- 
+        for ip_address in ip_addresses.clone() {
             let local_tx = tx.clone();
-            
+
             thread::spawn(move || {
                 let ping_opts = pingOptions(1, Duration::from_secs(1), &ip_address);
 
                 let stream = ping(ping_opts).expect("Error pinging");
-        
-                let message =  stream.iter().next().unwrap();
-        
+
+                let message = stream.iter().next().unwrap();
+
                 match message {
-                    PingResult::Pong(_,_ ) => local_tx.send(ip_address.to_owned()).unwrap(),
-                    _ => {}, 
+                    PingResult::Pong(_, _) => local_tx.send(ip_address.to_owned()).unwrap(),
+                    _ => {}
                 }
             });
         }
         drop(tx);
-        
-        rx.iter().collect()
+        ret_val = rx.iter().collect();
+    }
+    ret_val
+}
+
+impl IpPinger {
+    pub fn new(ip_addresses: Vec<String>, ping_count: u8, ping_interval: u64) -> Self {
+        Self {
+            ip_addresses,
+            ping_count,
+            ping_interval: Duration::from_secs(ping_interval),
+        }
     }
 
+    pub fn ping_in_range(&self, ping_cnt: u8) -> Vec<String> {
+        ping_ips(&self.ip_addresses, ping_cnt)
+    }
 }
 
 impl Pinger for IpPinger {
-    fn ping(&self, ip_address: &str)-> Result<(), &str> {
+    fn ping(&self, ip_address: &str) -> Result<(), &str> {
         let ping_opts = pingOptions(self.ping_count, self.ping_interval, ip_address);
 
         let stream = ping(ping_opts).expect("Error pinging");
 
-        let message =  stream.iter().next().unwrap();
+        let message = stream.iter().next().unwrap();
 
         match message {
-            PingResult::Pong(_,_ ) => Ok(()),
-            _ => Err("Some Error occured") 
+            PingResult::Pong(_, _) => Ok(()),
+            _ => Err("Some Error occured"),
         }
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -132,7 +136,7 @@ mod tests {
     #[test]
     fn ip_parses() {
         let result = InputIp::parse("192.168.86.127", 1, 255);
-        assert_eq!([192,168,86], result.ip_triplet);
+        assert_eq!([192, 168, 86], result.ip_triplet);
         println!("{}", result.to_string())
     }
 
@@ -156,6 +160,5 @@ mod tests {
         let results = ip_pinger.ping_in_range();
 
         println!("Working IPs {:?} ", results)
-    
     }
 }

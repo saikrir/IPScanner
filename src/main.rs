@@ -8,7 +8,7 @@ fn main() {
 
     let ip_pinger = IpPinger::new(ip_addr_range.ip_addresses, 2, 1);
 
-    let results = ip_pinger.ping_in_range();
+    let results = ip_pinger.ping_in_range(2);
 
     println!("Found {}, IPs: {:?} ", results.len(), results);
 }
