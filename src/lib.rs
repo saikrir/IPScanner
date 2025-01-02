@@ -76,7 +76,6 @@ pub struct IpPinger {
 fn ping_ips(ip_addresses: &Vec<String>, ping_cnt: u8) -> Vec<String> {
     let mut ret_val: Vec<String> = vec![];
     for _x in 1..=ping_cnt {
-        println!("Looping {_x}");
         let (tx, rx) = mpsc::channel::<String>();
         for ip_address in ip_addresses.clone() {
             let local_tx = tx.clone();
@@ -111,6 +110,10 @@ impl IpPinger {
 
     pub fn ping_in_range(&self, ping_cnt: u8) -> Vec<String> {
         ping_ips(&self.ip_addresses, ping_cnt)
+        // add sort on the ip addresses
+        // resolve nslookup
+        // code refactor to include windows
+        // fail safe if ping command was not available
     }
 }
 
