@@ -1,4 +1,4 @@
-use std::{ops::Range, sync::mpsc, thread, time::Duration};
+use std::{ops::Range, sync::mpsc, thread, time::{Duration, SystemTime}};
 
 use pinger::{ping, PingOptions, PingResult};
 
@@ -56,26 +56,19 @@ impl IpAddressRange {
     pub fn ip_count(&self) -> usize {
         self.ip_addresses.len()
     }
+
 }
 
-trait Pinger {
-    fn ping(&self, ip_address: &str) -> Result<(), &str>;
-}
 
 fn pingOptions(ping_count: u8, interval: Duration, ip_address: &str) -> PingOptions {
     let ping_options = PingOptions::new(ip_address, interval, None);
     ping_options.with_raw_arguments(vec!["-c", ping_count.to_string().as_str()])
 }
 
-pub struct IpPinger {
-    ip_addresses: Vec<String>,
-    ping_count: u8,
-    ping_interval: Duration,
-}
-
-fn ping_ips(ip_addresses: &Vec<String>, ping_cnt: u8) -> Vec<String> {
+pub fn ping_ips(ip_addresses: &Vec<String>, ping_cnt: u8) -> Vec<String> {
     let mut ret_val: Vec<String> = vec![];
     for _x in 1..=ping_cnt {
+        let start_time = SystemTime::now();
         let (tx, rx) = mpsc::channel::<String>();
         for ip_address in ip_addresses.clone() {
             let local_tx = tx.clone();
@@ -95,42 +88,38 @@ fn ping_ips(ip_addresses: &Vec<String>, ping_cnt: u8) -> Vec<String> {
         }
         drop(tx);
         ret_val = rx.iter().collect();
+        let elapsed = start_time.elapsed().unwrap();
+        println!("Pinged {} ips in {} Secods", ip_addresses.len(), elapsed.as_secs_f64());
     }
+    ret_val.sort_by(|s1, s2| s1.cmp(s2));
     ret_val
 }
 
-impl IpPinger {
-    pub fn new(ip_addresses: Vec<String>, ping_count: u8, ping_interval: u64) -> Self {
-        Self {
-            ip_addresses,
-            ping_count,
-            ping_interval: Duration::from_secs(ping_interval),
-        }
-    }
 
-    pub fn ping_in_range(&self, ping_cnt: u8) -> Vec<String> {
-        ping_ips(&self.ip_addresses, ping_cnt)
-        // add sort on the ip addresses
-        // resolve nslookup
-        // code refactor to include windows
-        // fail safe if ping command was not available
-    }
+
+trait Pinger {
+    fn ping(&self, ip_address: &str) -> Result<(), &str>;
 }
 
-impl Pinger for IpPinger {
-    fn ping(&self, ip_address: &str) -> Result<(), &str> {
-        let ping_opts = pingOptions(self.ping_count, self.ping_interval, ip_address);
+// pub struct IpPinger {
+//     ping_interval: Duration,
+// }
 
-        let stream = ping(ping_opts).expect("Error pinging");
 
-        let message = stream.iter().next().unwrap();
+// impl Pinger for IpPinger {
+//     fn ping(&self, ip_address: &str) -> Result<(), &str> {
+//         let ping_opts = pingOptions(1, self.ping_interval, ip_address);
 
-        match message {
-            PingResult::Pong(_, _) => Ok(()),
-            _ => Err("Some Error occured"),
-        }
-    }
-}
+//         let stream = ping(ping_opts).expect("Error pinging");
+
+//         let message = stream.iter().next().unwrap();
+
+//         match message {
+//             PingResult::Pong(_, _) => Ok(()),
+//             _ => Err("Some Error occured"),
+//         }
+//     }
+// }
 
 #[cfg(test)]
 mod tests {
@@ -151,17 +140,5 @@ mod tests {
         assert_eq!(254, ip_addr_range.ip_count());
     }
 
-    #[test]
-    fn ip_ping_works() {
-        let result = InputIp::parse("192.168.86.127", 1, 50);
-        let mut ip_addr_range = IpAddressRange::new();
-        ip_addr_range.generate(&result);
-        println!("IP Addresses {}", ip_addr_range.ip_count());
-
-        let ip_pinger = IpPinger::new(ip_addr_range.ip_addresses, 1, 1);
-
-        let results = ip_pinger.ping_in_range();
-
-        println!("Working IPs {:?} ", results)
-    }
+  
 }
