@@ -1,3 +1,4 @@
+use local_ip_address::local_ip;
 use pinger::{ping, PingOptions, PingResult};
 use std::cmp::Ordering;
 use std::collections::HashSet;
@@ -74,32 +75,14 @@ fn ping_options(ping_count: u8, interval: Duration, ip_address: &str) -> PingOpt
     }
 }
 
-pub fn ping_ips(ip_addresses: &Vec<String>, ping_cnt: u8) -> Vec<String> {
+pub fn ping_ips(ip_addresses: Vec<String>) -> Vec<String> {
     let start_time = SystemTime::now();
-    let mut final_set = HashSet::new();
-    let mut join_handles: Vec<JoinHandle<Vec<String>>> = vec![];
-    for _x in 1..=ping_cnt {
-        let ip_addresses = ip_addresses.clone();
-        join_handles.push(thread::spawn(|| perform_ping_async(ip_addresses)));
-    }
-
-    for handle in join_handles {
-        let ip_addresses = handle.join().unwrap();
-        for ip_address in ip_addresses {
-            final_set.insert(ip_address);
-        }
-    }
-
+    let ip_count = ip_addresses.len();
+    let mut final_set = perform_ping_async(ip_addresses);
+    final_set.sort_by(|x: &String, x1: &String| compare_ips::<&String>(x, x1));
     let elapsed = start_time.elapsed().unwrap();
-    println!(
-        "Pinged {} ips in {} Seconds",
-        ip_addresses.len(),
-        elapsed.as_secs_f64()
-    );
-
-    let mut v: Vec<String> = final_set.into_iter().collect();
-    v.sort_by(|x: &String, x1: &String| compare_ips::<&String>(x, x1));
-    v
+    println!("Pinged {ip_count} ips in {} Seconds", elapsed.as_secs_f64());
+    final_set
 }
 
 fn get_last_octet_for_ip(ip_address: &str) -> u8 {
@@ -130,6 +113,11 @@ fn perform_ping_async(ip_addresses: Vec<String>) -> Vec<String> {
     }
     drop(tx);
     rx.iter().collect()
+}
+
+pub fn get_local_ip_address() -> String {
+    let my_local_ip = local_ip().unwrap();
+    my_local_ip.to_string()
 }
 
 #[cfg(test)]
